@@ -17,7 +17,7 @@ An offline-first field companion for land surveyors, built for use anywhere in t
 | Windows | `Plumb-Portable-<version>.exe` | Single exe, no install |
 | Windows | `Plumb-<version>-win-x64.zip` | Unzip and run `Plumb Field Survey.exe` |
 
-GitHub Actions builds all of these on every push to `main`. They appear under the workflow run's **Artifacts**. Pushing a tag such as `v1.0.0` also attaches them to a GitHub Release.
+GitHub Actions builds all of these on every push to `main` and attaches them to the GitHub Release for the version in `package.json` (bump the version to publish a new release).
 
 ## Develop
 

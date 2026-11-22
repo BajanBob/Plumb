@@ -23,7 +23,7 @@ jobs:
       - name: Build APK
         working-directory: android
         run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
-      - run: mkdir -p out && cp android/app/build/outputs/apk/debug/app-debug.apk "out/Plumb-${GITHUB_REF_NAME//\//-}.apk"
+      - run: mkdir -p out && cp android/app/build/outputs/apk/debug/app-debug.apk "out/Plumb-$(node -p "require('./package.json').version").apk"
       - uses: actions/upload-artifact@v4
         with: { name: plumb-android, path: out/*.apk }
 
@@ -43,13 +43,20 @@ jobs:
             dist/*.zip
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
     needs: [android, windows]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      - id: v
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@v4
         with: { path: files, merge-multiple: true }
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ steps.v.outputs.version }}
+          name: Plumb ${{ steps.v.outputs.version }}
+          target_commitish: ${{ github.sha }}
           files: files/*
-          generate_release_notes: true
+          body: |
+            **Android:** download the .apk on your phone and open it (allow "Install unknown apps"). Debug-signed for sideloading.
+            **Windows:** Plumb-Setup installs it; Plumb-Portable runs without installing; the win-x64 zip unzips and runs.
