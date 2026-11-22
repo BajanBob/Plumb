@@ -1,0 +1,48 @@
+{
+  "name": "plumb-field-survey",
+  "productName": "Plumb Field Survey",
+  "version": "1.0.0",
+  "description": "Offline-first field survey companion: points with live QA, deed closure, coordinate conversion and CAD exports.",
+  "author": "BajanBob",
+  "license": "MIT",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win nsis portable zip --x64"
+  },
+  "build": {
+    "appId": "com.bajanbob.plumb",
+    "productName": "Plumb Field Survey",
+    "files": [
+      "electron/**",
+      "www/**"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "icon": "build/icon.png",
+      "artifactName": "Plumb-${version}-win-x64.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "Plumb-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "Plumb-Portable-${version}.${ext}"
+    }
+  },
+  "devDependencies": {
+    "@capacitor/android": "^6.2.3",
+    "@capacitor/cli": "^6.2.3",
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  },
+  "dependencies": {
+    "@capacitor/core": "^6.2.3",
+    "@capacitor/filesystem": "^6.0.4",
+    "@capacitor/geolocation": "^6.1.1",
+    "@capacitor/share": "^6.0.4"
+  }
+}

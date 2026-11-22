@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plumb Field Survey</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: a working field instrument — direct, calm, no decoration that isn't data.
+   IDEA: the surveyor's field book: plan sketch on the left page, the point register on the right.
+   PICTURE: the live plan plot of the job, points coloured by their QA state, with scale bar.
+   COLOUR and TYPE: white page, deep ink, fluorescent flagging-tape pink as the brand, tripod yellow for warnings; Barlow (road-sign lettering).
+   LAYOUT: sticky tab strip; each tool opens mid-use; plot + entry form side by side, register below; stacks under 600px. */
+:root{color-scheme:light dark;
+--bg:light-dark(#ffffff,#16131b);--ink:light-dark(#1d1a24,#f2eff6);--mute:light-dark(#625d6b,#a8a2b2);
+--line:light-dark(#e4e0ea,#2e2936);--card:light-dark(#f7f5fa,#1f1b26);
+--pink:light-dark(#d81b60,#ff5c93);--pinkbg:light-dark(#fde7ef,#3a1526);
+--warn:light-dark(#9a6b00,#f5c400);--warnbg:light-dark(#fff5cc,#2f2706);
+--err:light-dark(#c62828,#ff6b6b);--errbg:light-dark(#fde8e8,#3a1414);
+--ok:light-dark(#1e6b52,#5fd3a8)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Barlow,system-ui,sans-serif;overflow-x:clip}
+.num,td.n,input.n{font-family:"Barlow Semi Condensed",Barlow,sans-serif;font-variant-numeric:tabular-nums}
+header.top{background:var(--pink);color:#fff;padding:14px max(4vw,16px) 0}
+.brand{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brand h1{font-size:34px;line-height:1.05;margin:0;font-weight:700;letter-spacing:-.5px}
+.brand svg{width:34px;height:34px;flex:none}
+.brand .proj{flex:1 1 220px;display:flex;gap:8px;align-items:center}
+.brand input{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.4);color:#fff;font-weight:600}
+.brand input::placeholder{color:rgba(255,255,255,.75)}
+#sync{font-size:13px;opacity:.9;white-space:nowrap}
+nav.tabs{display:flex;gap:4px;margin-top:12px;overflow-x:auto}
+nav.tabs a{flex:none;color:#fff;text-decoration:none;padding:10px 16px;font-weight:600;border-radius:10px 10px 0 0;opacity:.85;min-height:44px}
+nav.tabs a.on{background:var(--bg);color:var(--ink);opacity:1}
+main{max-width:1240px;margin:0 auto;padding:20px max(4vw,16px) 60px}
+.view{display:none}.view.on{display:block}
+h2{font-size:32px;line-height:1.1;margin:6px 0 4px;text-wrap:balance}
+h3{font-size:20px;margin:0 0 10px}
+p.lede{color:var(--mute);margin:0 0 18px;max-width:70ch}
+input,select,textarea,button{font:inherit;font-size:16px;color:inherit}
+input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);min-height:44px}
+textarea{min-height:110px;resize:vertical}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{outline:3px solid var(--pink);outline-offset:2px}
+label{display:block;font-size:14px;font-weight:600;color:var(--mute);margin-bottom:4px}
+button{min-height:44px;padding:8px 16px;border-radius:10px;border:1px solid var(--line);background:var(--card);cursor:pointer;font-weight:600}
+button.pri{background:var(--pink);border-color:var(--pink);color:#fff}
+button.sm{min-height:36px;padding:4px 10px;font-size:14px}
+button:disabled{opacity:.5;cursor:default}
+.row{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));margin-bottom:10px}
+.card{background:var(--card);border-radius:14px;padding:16px}
+.split{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:18px;align-items:start}
+.fig{position:relative;min-height:400px;background:var(--card);border-radius:14px;overflow:hidden}
+.fig>svg{position:absolute;inset:0;width:100%;height:100%}
+.qa{display:flex;gap:16px;align-items:center;flex-wrap:wrap;padding:14px 16px;border-radius:14px;margin-bottom:18px}
+.qa.good{background:light-dark(#e6f4ee,#11281f)}.qa.bad{background:var(--warnbg)}.qa.worse{background:var(--errbg)}
+.qa .big{font-size:44px;font-weight:700;line-height:1}
+.qa .msg{flex:1 1 260px}.qa .msg b{display:block;font-size:18px}
+.qa ul{margin:6px 0 0;padding-left:18px;font-size:14px}
+.tbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:22px 0 10px}
+.tbar input{flex:1 1 200px;width:auto}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th{text-align:left;font-size:13px;color:var(--mute);font-weight:600;padding:8px 6px;border-bottom:2px solid var(--line);white-space:nowrap}
+td{padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+td.n,th.n{text-align:right;white-space:nowrap}
+tr.sel td{background:var(--pinkbg)}
+.flag{display:inline-block;font-size:13px;padding:1px 8px;border-radius:999px;margin:1px 2px 1px 0;white-space:nowrap}
+.flag.e{background:var(--errbg);color:var(--err)}.flag.w{background:var(--warnbg);color:var(--warn)}.flag.i{background:var(--line);color:var(--mute)}
+.okc{color:var(--ok);font-weight:600}
+.thumb{width:44px;height:44px;object-fit:cover;border-radius:8px;display:block}
+.res{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:14px 0}
+.res div{background:var(--card);border-radius:12px;padding:12px}
+.res span{display:block;font-size:13px;color:var(--mute);font-weight:600}
+.res b{font-size:clamp(22px,4vw,30px);line-height:1.1;font-family:"Barlow Semi Condensed",Barlow;font-variant-numeric:tabular-nums;white-space:nowrap}
+.calls .crow{display:grid;grid-template-columns:28px minmax(0,1.4fr) minmax(0,1fr) 44px;gap:8px;align-items:center;margin-bottom:8px}
+.calls .crow span{color:var(--mute);font-size:14px;text-align:right}
+.ok-in{border-color:var(--line)}.bad-in{border-color:var(--err)!important}
+.note{font-size:14px;color:var(--mute)}
+pre{background:var(--card);padding:12px;border-radius:10px;max-height:260px;overflow:auto;font-size:13px}
+pre,.scroll{overflow-x:auto}
+.exp{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:14px}
+.exp .card p{margin:4px 0 12px;font-size:14px;color:var(--mute)}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;display:none;gap:12px;align-items:center;z-index:9;max-width:92vw}
+#toast button{background:transparent;color:inherit;border-color:currentColor;min-height:36px}
+details summary{cursor:pointer;font-weight:600;min-height:44px;display:flex;align-items:center}
+.hide{display:none!important}
+@media(max-width:860px){.split{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:600px){h2{font-size:26px}.brand h1{font-size:28px}.fig{min-height:300px}table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px;border-bottom:1px solid var(--line)}.stack td{display:flow-root;border:0;padding:3px 0;padding-inline-start:7em;text-align:start}.stack td::before{content:attr(data-l);float:inline-start;width:6.5em;margin-inline-start:-7em;color:var(--mute);font-size:12px}.stack td:empty{display:none}}
+@media(prefers-reduced-motion:no-preference){.pt-new{animation:pop .5s ease-out}@keyframes pop{from{r:14}}}
+</style>
+<script>new MutationObserver(()=>{for(const c of document.querySelectorAll('.stack td:not([data-l])')){let i=0,p=c;while(p=p.previousElementSibling)i+=p.colSpan;c.dataset.l=c.closest('table').rows[0].cells[i]?.textContent||''}}).observe(document,{childList:true,subtree:true})</script>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg viewBox="0 0 34 34" aria-hidden="true"><path d="M17 2v18" stroke="#fff" stroke-width="2.5"/><path d="M10 16h14l-7 15z" fill="#fff"/><circle cx="17" cy="4" r="2.5" fill="#fff"/></svg>
+    <h1>Plumb</h1>
+    <div class="proj"><input id="projName" aria-label="Job name" placeholder="Job name"></div>
+    <span id="sync">Saved on this device</span>
+  </div>
+  <nav class="tabs" aria-label="Tools">
+    <a href="#points">Points &amp; QA</a><a href="#closure">Deed closure</a><a href="#convert">Convert</a><a href="#export">Export</a>
+  </nav>
+</header>
+<main>
+<section id="v-points" class="view">
+  <div id="qa" class="qa"></div>
+  <div class="split">
+    <div class="fig" id="plotWrap"><svg id="plot" role="img" aria-label="Plan of surveyed points"></svg></div>
+    <form id="ptForm" class="card" autocomplete="off">
+      <h3 id="formTitle">Add point</h3>
+      <div class="row"><div><label for="fId">Point ID</label><input id="fId" required></div>
+        <div><label for="fCode">Code</label><input id="fCode" list="codes" placeholder="IP, FN, KB…"></div></div>
+      <datalist id="codes"></datalist>
+      <div class="row"><div><label for="fMode">Enter as</label><select id="fMode"><option value="geo">Latitude / longitude</option><option value="utm">UTM easting / northing</option></select></div></div>
+      <div class="row"><div><label for="fA" id="lA">Latitude</label><input id="fA" class="n" inputmode="decimal" required></div>
+        <div><label for="fB" id="lB">Longitude</label><input id="fB" class="n" inputmode="decimal" required></div></div>
+      <div class="row"><div><label for="fH">Height (m)</label><input id="fH" class="n" inputmode="decimal"></div>
+        <div><label for="fAcc">H. accuracy (m)</label><input id="fAcc" class="n" inputmode="decimal"></div></div>
+      <div class="row"><div><label for="fFix">Solution</label><select id="fFix"><option>RTK fixed</option><option>RTK float</option><option>PPK / static</option><option>DGPS / SBAS</option><option>Autonomous</option><option>Total station</option></select></div>
+        <div><label for="fPh">Photo</label><input id="fPh" type="file" accept="image/*" capture="environment"></div></div>
+      <p class="note hide" id="gpsMsg" style="margin:0 0 10px"></p><div style="margin-bottom:10px"><label for="fNote">Note</label><input id="fNote" placeholder="e.g. iron pin found, bent 5° north"></div>
+      <div class="btns"><button type="button" id="gpsBtn" class="hide">Use device GPS</button><button class="pri" type="submit" id="fSave">Add point</button><button type="button" id="fCancel" class="hide">Cancel edit</button></div>
+    </form>
+  </div>
+  <div class="tbar"><input id="q" type="search" placeholder="Search ID, code or note" aria-label="Search points">
+    <label style="margin:0;display:flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" id="onlyIss" style="width:20px;min-height:20px"> Issues only</label>
+    <button type="button" id="setBtn">Tolerances</button><button type="button" id="impBtn">Import</button><button type="button" id="newJob">New job</button></div>
+  <div id="setBox" class="card hide" style="margin-bottom:12px"><div class="row">
+    <div><label for="sTol">Max H. accuracy (m)</label><input id="sTol" class="n" inputmode="decimal"></div>
+    <div><label for="sNear">Double-shot distance (m)</label><input id="sNear" class="n" inputmode="decimal"></div>
+    <div><label for="sCtl">Min. control points</label><input id="sCtl" class="n" inputmode="numeric"></div>
+    <div><label for="sZone">UTM zone (blank = auto)</label><input id="sZone" placeholder="e.g. 21N"></div></div>
+    <p class="note" style="margin:0">Control codes counted: CP, BM, CTRL, GCP. Float, DGPS and autonomous fixes are flagged.</p></div>
+  <div id="impBox" class="card hide" style="margin-bottom:12px">
+    <label for="impTxt">Paste a CSV from your receiver or controller</label>
+    <textarea id="impTxt" placeholder="PNEZD, or columns named id, lat, lon, h, code…"></textarea>
+    <p class="note">Reads headers like id/name, lat/lon, easting/northing, h/elev/z, code/desc. Without headers, five columns of grid numbers are read as P,N,E,Z,D and lat/lon values as P,Lat,Lon,H,Code.</p>
+    <div class="btns"><input type="file" id="impFile" accept=".csv,.txt,text/csv,text/plain" style="flex:1 1 200px;width:auto"><button class="pri" type="button" id="impGo">Import points</button></div></div>
+  <div class="scroll"><table class="stack" id="ptTable"></table></div>
+</section>
+
+<section id="v-closure" class="view">
+  <h2>Check a boundary description closes</h2>
+  <p class="lede">Enter the calls from a deed or plan, in any unit. Plumb works out the misclosure, the precision ratio and the area, and plots the figure. You can also have Claude read the calls from pasted text or a photo of an old document.</p>
+  <div class="split">
+    <div>
+      <div class="res" id="cRes"></div>
+      <div class="fig" style="min-height:340px"><svg id="cPlot" role="img" aria-label="Plot of the boundary"></svg></div>
+    </div>
+    <div class="card">
+      <div class="row"><div><label for="cUnit">Distance unit</label><select id="cUnit"></select></div></div>
+      <div class="calls" id="calls"></div>
+      <div class="btns"><button type="button" id="cAdd">Add call</button><button type="button" id="cClear">Clear</button></div>
+      <p class="note">Bearings: N 45°30'15" E, N45-30-15E, or an azimuth such as 225.5 or 225°30'.</p>
+      <details id="aiBox"><summary>Read calls from a document with Claude</summary>
+        <label for="aiTxt">Paste the description</label><textarea id="aiTxt" placeholder="…thence North 3 degrees 34 minutes 40 seconds East 105.00 feet…"></textarea>
+        <div id="aiImgRow" class="hide" style="margin-top:8px"><label for="aiImg">Or a photo of the deed or plan</label><input type="file" id="aiImg" accept="image/*"></div>
+        <div class="btns" style="margin-top:10px"><button class="pri" type="button" id="aiGo">Read calls</button><button type="button" id="aiStop" class="hide">Stop</button></div>
+        <p class="note" id="aiMsg">Check every call against the source before relying on it.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section id="v-convert" class="view">
+  <h2>Coordinate and unit converter</h2>
+  <p class="lede">WGS84 / ITRF latitude and longitude to UTM and back, for any zone worldwide, and conversion between old and modern distance units. Local or national grids need their own datum transformation.</p>
+  <div class="exp">
+    <div class="card"><h3>Lat/long to UTM</h3>
+      <div class="row"><div><label for="g1">Latitude</label><input id="g1" class="n" value="13°05'51&quot;N"></div><div><label for="g2">Longitude</label><input id="g2" class="n" value="59°37'00&quot;W"></div></div>
+      <div class="res" id="gOut" style="grid-template-columns:1fr 1fr"></div></div>
+    <div class="card"><h3>UTM to lat/long</h3>
+      <div class="row"><div><label for="u0">Zone</label><input id="u0" value="21N"></div><div><label for="u1">Easting</label><input id="u1" class="n" inputmode="decimal" value="216267.168"></div><div><label for="u2">Northing</label><input id="u2" class="n" inputmode="decimal" value="1449386.861"></div></div>
+      <div class="res" id="uOut" style="grid-template-columns:1fr 1fr"></div></div>
+    <div class="card"><h3>Distance units</h3>
+      <div class="row"><div><label for="d1">Value</label><input id="d1" class="n" inputmode="decimal" value="3.25"></div><div><label for="d2">From</label><select id="d2"></select></div></div>
+      <table id="dOut"></table></div>
+  </div>
+</section>
+
+<section id="v-export" class="view">
+  <h2>Send the job to the office</h2>
+  <p class="lede" id="expLede"></p>
+  <div class="exp" id="expGrid"></div>
+  <h3 style="margin-top:24px">Preview</h3>
+  <pre id="expPre"></pre>
+</section>
+</main>
+<div id="toast" role="status"><span id="toastMsg"></span><button id="toastBtn" class="hide">Undo</button></div>
+
+<script>
+{
+const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const UNITS={m:['Metres',1],ft:['International feet',0.3048],usft:['US survey feet',1200/3937],ch:["Gunter's chains",20.1168],lk:['Links',0.201168],rod:['Rods / poles / perches',5.0292],yd:['Yards',0.9144]};
+const CODES=['CP','BM','GCP','IP','IPF','MON','FN','WALL','KB','EP','BLDG','MH','TR','POLE','GND','DRN'];
+const CTRL=['CP','BM','CTRL','GCP'], WEAK=['RTK float','DGPS / SBAS','Autonomous'];
+const SAMPLE_NOTE='Sample job, so you can see the checks working. Choose New job to start your own.';
+
+/* ---------- geodesy: WGS84 transverse Mercator (Krüger series) ---------- */
+const a=6378137,f=1/298.257223563,k0=0.9996,n=f/(2-f),n2=n*n,n3=n2*n,e=2*Math.sqrt(n)/(1+n);
+const A=a/(1+n)*(1+n2/4+n2*n2/64);
+const al=[n/2-2*n2/3+5*n3/16,13*n2/48-3*n3/5,61*n3/240], be=[n/2-2*n2/3+37*n3/96,n2/48+n3/15,17*n3/480], de=[2*n-2*n2/3-2*n3,7*n2/3-8*n3/5,56*n3/15];
+const R=Math.PI/180;
+function natZone(lat,lon){let z=Math.floor((lon+180)/6)+1;if(z>60)z=60;
+  if(lat>=56&&lat<64&&lon>=3&&lon<12)z=32;
+  if(lat>=72&&lat<84){if(lon>=0&&lon<9)z=31;else if(lon>=9&&lon<21)z=33;else if(lon>=21&&lon<33)z=35;else if(lon>=33&&lon<42)z=37}
+  return z}
+function toUTM(lat,lon,zone,south){zone=zone||natZone(lat,lon);if(south==null)south=lat<0;
+  const l0=((zone-1)*6-180+3)*R,phi=lat*R,dl=lon*R-l0,s=Math.sin(phi);
+  const t=Math.sinh(Math.atanh(s)-e*Math.atanh(e*s)),xp=Math.atan2(t,Math.cos(dl)),ep=Math.atanh(Math.sin(dl)/Math.sqrt(1+t*t));
+  let x=xp,y=ep;for(let j=1;j<=3;j++){x+=al[j-1]*Math.sin(2*j*xp)*Math.cosh(2*j*ep);y+=al[j-1]*Math.cos(2*j*xp)*Math.sinh(2*j*ep)}
+  return{zone,south,E:500000+k0*A*y,N:(south?10000000:0)+k0*A*x,k:k0*(1+((k0*A*y)**2)/(2*(a*0.9983)**2)),conv:Math.atan(Math.tan(dl)*s)/R}}
+function fromUTM(E,N,zone,south){const xi=(N-(south?10000000:0))/(k0*A),eta=(E-500000)/(k0*A);
+  let xp=xi,ep=eta;for(let j=1;j<=3;j++){xp-=be[j-1]*Math.sin(2*j*xi)*Math.cosh(2*j*eta);ep-=be[j-1]*Math.cos(2*j*xi)*Math.sinh(2*j*eta)}
+  const chi=Math.asin(Math.sin(xp)/Math.cosh(ep));let phi=chi;for(let j=1;j<=3;j++)phi+=de[j-1]*Math.sin(2*j*chi);
+  return{lat:phi/R,lon:((zone-1)*6-180+3)+Math.atan2(Math.sinh(ep),Math.cos(xp))/R}}
+function parseAngle(str,neg){str=String(str??'').trim();if(!str)return NaN;
+  let sign=1;const h=str.match(/[NSEWnsew]/);if(h&&/[SWsw]/.test(h[0]))sign=-1;
+  const nums=str.replace(/[NSEWnsew]/g,' ').match(/-?\d+(?:\.\d+)?/g);if(!nums)return NaN;
+  if(nums[0].startsWith('-')){sign*=-1;nums[0]=nums[0].slice(1)}
+  const v=(+nums[0])+(+(nums[1]||0))/60+(+(nums[2]||0))/3600;return sign*v}
+function dms(v,pos,negc){const s=v<0?negc:pos;v=Math.abs(v);let d=Math.floor(v),m=Math.floor((v-d)*60),sec=((v-d)*60-m)*60;
+  if(+sec.toFixed(2)>=60){sec=0;m++}if(m>=60){m=0;d++}return `${d}°${String(m).padStart(2,'0')}'${sec.toFixed(2).padStart(5,'0')}"${s}`}
+function parseZone(s){const m=String(s||'').trim().match(/^(\d{1,2})\s*([A-Za-z]?)$/);if(!m)return null;const z=+m[1];if(z<1||z>60)return null;
+  const L=m[2].toUpperCase();return{zone:z,south:L?(L==='S'||(L<'N'&&L!=='')):false}}
+/* bearings → azimuth degrees */
+function parseBearing(str){str=String(str||'').trim().toUpperCase().replace(/DEG(REES)?|MIN(UTES)?|SEC(ONDS)?/g,' ').replace(/NORTH/g,'N').replace(/SOUTH/g,'S').replace(/EAST/g,'E').replace(/WEST/g,'W');
+  if(!str)return NaN;const q=str.match(/^([NS])(.*?)([EW])$/);
+  if(q){const ang=parseAngle(q[2]);if(!(ang>=0&&ang<=90))return NaN;
+    return q[1]==='N'?(q[3]==='E'?ang:360-ang):(q[3]==='E'?180-ang:180+ang)}
+  if(/[NSEW]/.test(str))return NaN;const az=parseAngle(str);return az>=0&&az<360?az:NaN}
+function quad(az){az=((az%360)+360)%360;let ns='N',ew='E',v=az;if(az>90&&az<=180){ns='S';v=180-az}else if(az>180&&az<=270){ns='S';ew='W';v=az-180}else if(az>270){ew='W';v=360-az}
+  return `${ns} ${dms(v,'','').replace(/"$/,'"')} ${ew}`}
+const fmt=(v,d=3)=>v==null||!isFinite(v)?'—':v.toLocaleString('en',{minimumFractionDigits:d,maximumFractionDigits:d});
+
+/* ---------- state & storage ---------- */
+const uid=()=>Math.random().toString(36).slice(2,10);
+const blank=()=>({v:1,updated:0,name:'',zone:'',tol:0.05,near:0.05,minCtl:2,mode:'geo',points:[],deed:{unit:'m',calls:[{b:'',d:''},{b:'',d:''},{b:'',d:''}]},sample:false});
+let S=blank(),photos={},sel=null,editing=null,undo=null;
+function sampleJob(){const s=blank();s.name='Lot 14 boundary — sample';s.sample=true;const z=21,b={E:216300,N:1449420};
+  const P=[['CP1','CP',0,0,1.204,.011,'RTK fixed','Control, brass disc in kerb'],['CP2','CP',86.4,11.9,2.012,.013,'RTK fixed','Control, nail in wall'],
+  ['101','IP',12.1,8.3,1.55,.016,'RTK fixed','Iron pin found'],['102','IP',44.0,10.2,1.71,.018,'RTK fixed','Iron pin found, bent'],
+  ['103','IP',45.9,-22.4,1.62,.094,'RTK float','Under tree canopy'],['104','IP',13.8,-24.0,1.41,.021,'RTK fixed','Pin set'],
+  ['105','FN',28.0,9.6,1.66,.017,'RTK fixed','Fence post'],['106','FN',28.01,9.61,1.66,.018,'RTK fixed','Fence post'],
+  ['107','BLDG',22.0,-4.0,1.80,.019,'RTK fixed','House corner'],['107','BLDG',34.5,-4.6,1.82,.02,'RTK fixed','House corner'],
+  ['108','BLDG',34.0,-15.5,null,.025,'Autonomous','House corner, phone GPS'],['109','KB',2.0,-30.0,1.10,.015,'RTK fixed','']];
+  s.points=P.map(p=>{const g=fromUTM(b.E+p[2],b.N+p[3],z,false);return{u:uid(),id:p[0],code:p[1],lat:g.lat,lon:g.lon,h:p[4],acc:p[5],fix:p[6],note:p[7],t:Date.now()}});
+  s.deed={unit:'ft',calls:[{b:'N 03°34\'40" E',d:'105.00'},{b:'S 86°25\'20" E',d:'98.42'},{b:'S 03°34\'40" W',d:'104.87'},{b:'N 86°25\'20" W',d:'98.50'}]};return s}
+try{const j=localStorage.getItem('plumb.v1');if(j)S=Object.assign(blank(),JSON.parse(j));else S=sampleJob()}catch(_){S=sampleJob()}
+let db=null,myId=null,saveT=null,writing=Promise.resolve();
+function setSync(t){$('#sync').textContent=t}
+function save(){S.updated=Date.now();try{localStorage.setItem('plumb.v1',JSON.stringify(S))}catch(_){}
+  clearTimeout(saveT);saveT=setTimeout(pushRemote,900)}
+function pushRemote(){if(!db||!myId)return;const body={json:JSON.stringify(S),updated:S.updated};
+  writing=writing.then(()=>db.doc(`data/users/${myId}/project`).set(body)).then(()=>setSync('Saved to your account'),err=>setSync(err&&err.code==='quota_exceeded'?'Account storage full':'Saved on this device only'))}
+function savePhoto(u,d){photos[u]=d;try{localStorage.setItem('plumb.ph.'+u,d)}catch(_){}
+  if(db&&myId)writing=writing.then(()=>db.doc(`data/users/${myId}/ph-${u}`).set({d})).catch(()=>{})}
+function dropPhoto(u){delete photos[u];try{localStorage.removeItem('plumb.ph.'+u)}catch(_){}if(db&&myId)writing=writing.then(()=>db.doc(`data/users/${myId}/ph-${u}`).delete()).catch(()=>{})}
+for(const p of S.points)if(p.ph){try{const d=localStorage.getItem('plumb.ph.'+p.u);if(d)photos[p.u]=d}catch(_){}}
+
+/* ---------- computation ---------- */
+function jobZone(){const z=parseZone(S.zone);if(z)return z;const p=S.points[0];return p?{zone:natZone(p.lat,p.lon),south:p.lat<0}:{zone:null,south:false}}
+function compute(){const Z=jobZone(),tol=+S.tol||0.05,near=+S.near||0.05;
+  const pts=S.points.map(p=>{const u=toUTM(p.lat,p.lon,Z.zone,Z.south);return{...p,E:u.E,N:u.N,flags:[]}});
+  const ids={};for(const p of pts)ids[p.id]=(ids[p.id]||0)+1;
+  for(const p of pts){if(ids[p.id]>1)p.flags.push(['e','Duplicate ID']);
+    if(p.acc!=null&&p.acc>tol)p.flags.push(['w',`Accuracy ${fmt(p.acc,3)} m > ${fmt(tol,3)}`]);
+    if(WEAK.includes(p.fix))p.flags.push(['w',p.fix+' solution']);
+    if(p.acc==null&&p.fix!=='Total station')p.flags.push(['i','No accuracy']);
+    if(p.h==null)p.flags.push(['i','No height']);if(!p.code)p.flags.push(['i','No code']);
+    if(Z.zone&&natZone(p.lat,p.lon)!==Z.zone)p.flags.push(['w','Outside job zone'])}
+  const sorted=[...pts].sort((x,y)=>x.E-y.E);
+  for(let i=0;i<sorted.length;i++)for(let j=i+1;j<sorted.length&&sorted[j].E-sorted[i].E<=near;j++){const p=sorted[i],q=sorted[j],d=Math.hypot(p.E-q.E,p.N-q.N);
+    if(d<=near&&p.id!==q.id){p.flags.push(['w',`Double shot? ${fmt(d,3)} m from ${q.id}`]);q.flags.push(['w',`Double shot? ${fmt(d,3)} m from ${p.id}`])}}
+  const ctl=pts.filter(p=>CTRL.includes((p.code||'').toUpperCase())&&!p.flags.some(f=>f[0]!=='i')).length;
+  const job=[];if(pts.length&&ctl<(+S.minCtl||0))job.push(`Only ${ctl} clean control point${ctl===1?'':'s'}; you need ${S.minCtl}. Tie in to control before you leave.`);
+  return{Z,pts,job}}
+const sev=p=>p.flags.some(f=>f[0]==='e')?'e':p.flags.some(f=>f[0]==='w')?'w':'ok';
+
+/* ---------- points view ---------- */
+function renderQA(C){const bad=C.pts.filter(p=>sev(p)!=='ok'),errs=C.pts.filter(p=>sev(p)==='e').length,n=bad.length+C.job.length,qa=$('#qa');
+  qa.className='qa '+(errs?'worse':n?'bad':'good');
+  if(!C.pts.length){qa.innerHTML='<div class="msg"><b>No points yet</b>Add points below or import a CSV from your receiver.</div>';return}
+  const top=[...C.job.map(esc),...bad.slice(0,4).map(p=>`<b style="display:inline">${esc(p.id)}</b>: ${p.flags.filter(f=>f[0]!=='i').map(f=>esc(f[1])).join('; ')}`)];
+  qa.innerHTML=`<div class="big num">${n||'✓'}</div><div class="msg"><b>${n?`${n} issue${n>1?'s':''} to clear before you leave site`:'Ready to leave site'}</b>${C.pts.length} points in UTM zone ${C.Z.zone}${C.Z.south?'S':'N'}${S.sample?' · '+SAMPLE_NOTE:''}${top.length?`<ul>${top.map(t=>`<li>${t}</li>`).join('')}${bad.length>4?`<li>and ${bad.length-4} more below</li>`:''}</ul>`:''}</div>`}
+function plot(svg,pts,opts={}){const W=svg.clientWidth,H=svg.clientHeight;if(!W||!H)return;
+  if(!pts.length){svg.innerHTML=`<text x="${W/2}" y="${H/2}" text-anchor="middle" fill="var(--mute)" font-size="15">${opts.empty||'Nothing to plot yet'}</text>`;return}
+  let x0=Math.min(...pts.map(p=>p.E)),x1=Math.max(...pts.map(p=>p.E)),y0=Math.min(...pts.map(p=>p.N)),y1=Math.max(...pts.map(p=>p.N));
+  const span=Math.max(x1-x0,y1-y0,1),pad=42,sc=Math.min((W-pad*2)/Math.max(x1-x0,span*.05),(H-pad*2)/Math.max(y1-y0,span*.05));
+  const cx=(x0+x1)/2,cy=(y0+y1)/2,X=E=>W/2+(E-cx)*sc,Y=N=>H/2-(N-cy)*sc;
+  const raw=80/sc,mag=10**Math.floor(Math.log10(raw)),step=[1,2,5,10].map(m=>m*mag).find(s=>s>=raw);
+  let g='';for(let e=Math.ceil((cx-W/2/sc)/step)*step;e<cx+W/2/sc;e+=step)g+=`<line x1="${X(e)}" x2="${X(e)}" y1="0" y2="${H}"/>`;
+  for(let nn=Math.ceil((cy-H/2/sc)/step)*step;nn<cy+H/2/sc;nn+=step)g+=`<line y1="${Y(nn)}" y2="${Y(nn)}" x1="0" x2="${W}"/>`;
+  const col={e:'var(--err)',w:'var(--warn)',ok:'var(--pink)'};
+  let body=opts.extra?opts.extra(X,Y):'';
+  body+=pts.map(p=>{const s=opts.sev?opts.sev(p):'ok',on=p.u&&p.u===sel;return `<g data-u="${p.u||''}" style="cursor:${p.u?'pointer':'default'}"><circle cx="${X(p.E)}" cy="${Y(p.N)}" r="${on?9:6}" fill="${col[s]}" stroke="var(--bg)" stroke-width="2" ${p.u&&p.u===opts.fresh?'class="pt-new"':''}/>${W>420||on?`<text x="${X(p.E)+9}" y="${Y(p.N)-8}" font-size="13" fill="var(--ink)" font-weight="${on?700:500}">${esc(p.id)}</text>`:''}<circle cx="${X(p.E)}" cy="${Y(p.N)}" r="20" fill="transparent"/></g>`}).join('');
+  const bl=step*sc;svg.innerHTML=`<g stroke="var(--line)" stroke-width="1">${g}</g>${body}
+  <g transform="translate(16,${H-18})"><rect width="${bl}" height="6" fill="var(--ink)"/><text y="-6" font-size="12" fill="var(--mute)">${step>=1?step:step.toPrecision(1)} m</text></g>
+  <g transform="translate(${W-26},30)"><path d="M0-16L7 6 0 1-7 6z" fill="var(--ink)"/><text y="20" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)">N</text></g>`}
+let lastC=null,fresh=null;
+function renderPoints(){const C=lastC=compute();renderQA(C);
+  plot($('#plot'),C.pts,{sev,fresh,empty:'Points you add appear here, to scale'});fresh=null;
+  const q=$('#q').value.trim().toLowerCase(),only=$('#onlyIss').checked;
+  const rows=C.pts.filter(p=>(!q||[p.id,p.code,p.note].join(' ').toLowerCase().includes(q))&&(!only||sev(p)!=='ok'));
+  $('#ptTable').innerHTML=`<thead><tr><th>ID</th><th>Code</th><th class="n">Easting</th><th class="n">Northing</th><th class="n">Height</th><th class="n">Acc.</th><th>Solution</th><th>Note</th><th>Checks</th><th>Photo</th><th></th></tr></thead><tbody>${
+   rows.map(p=>`<tr data-u="${p.u}" class="${p.u===sel?'sel':''}"><td><b>${esc(p.id)}</b></td><td>${esc(p.code)}</td><td class="n">${fmt(p.E)}</td><td class="n">${fmt(p.N)}</td><td class="n">${p.h==null?'—':fmt(p.h)}</td><td class="n">${p.acc==null?'—':fmt(p.acc)}</td><td>${esc(p.fix)}</td><td>${esc(p.note)}</td><td>${p.flags.length?p.flags.map(f=>`<span class="flag ${f[0]}">${esc(f[1])}</span>`).join(''):'<span class="okc">Clear</span>'}</td><td>${photos[p.u]?`<img class="thumb" alt="Photo of ${esc(p.id)}" src="${photos[p.u]}">`:''}</td><td><div class="btns"><button class="sm" data-act="edit">Edit</button><button class="sm" data-act="del">Delete</button></div></td></tr>`).join('')
+   ||`<tr><td colspan="11" class="note">${S.points.length?'No points match.':'No points yet.'}</td></tr>`}</tbody>`;
+  $('#projName').value=S.name||'';renderExport()}
+function nextId(){const nums=S.points.map(p=>+p.id).filter(isFinite);return String(nums.length?Math.max(...nums)+1:1)}
+function setMode(m){S.mode=m;$('#fMode').value=m;const g=m==='geo',z=jobZone();$('#lA').textContent=g?'Latitude':'Easting';$('#lB').textContent=g?'Longitude':'Northing';
+  $('#fA').placeholder=g?"13.0975 or 13°05'51\"N":'e.g. 433200.000';$('#fB').placeholder=g?"-59.6167 or 59°37'W":'e.g. 1448300.000';
+  if(!g&&!z.zone)$('#fB').placeholder+=' (set zone in Tolerances)'}
+function resetForm(){editing=null;$('#ptForm').reset();$('#fId').value=nextId();setMode(S.mode);$('#formTitle').textContent='Add point';$('#fSave').textContent='Add point';$('#fCancel').classList.add('hide')}
+function startEdit(u){const p=S.points.find(x=>x.u===u);if(!p)return;editing=u;sel=u;setMode('geo');
+  $('#fId').value=p.id;$('#fCode').value=p.code||'';$('#fA').value=p.lat.toFixed(9);$('#fB').value=p.lon.toFixed(9);$('#fH').value=p.h??'';$('#fAcc').value=p.acc??'';$('#fFix').value=p.fix;$('#fNote').value=p.note||'';
+  $('#formTitle').textContent='Edit point '+p.id;$('#fSave').textContent='Save changes';$('#fCancel').classList.remove('hide');renderPoints();$('#ptForm').scrollIntoView({behavior:'smooth',block:'nearest'})}
+const numOrNull=v=>{v=String(v).trim();if(v==='')return null;const x=+v.replace(',','.');return isFinite(x)?x:null};
+function shrink(file){return new Promise((res,rej)=>{const img=new Image(),url=URL.createObjectURL(file);img.onload=()=>{const s=Math.min(1,480/Math.max(img.width,img.height)),c=document.createElement('canvas');
+  c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);res(c.toDataURL('image/jpeg',.7))};img.onerror=rej;img.src=url})}
+$('#ptForm').addEventListener('submit',async ev=>{ev.preventDefault();let lat,lon;
+  if($('#fMode').value==='geo'){lat=parseAngle($('#fA').value);lon=parseAngle($('#fB').value)}
+  else{const z=jobZone();if(!z.zone){toast('Set the job UTM zone under Tolerances first');return}const E=numOrNull($('#fA').value),N=numOrNull($('#fB').value);if(E==null||N==null){toast('Enter easting and northing');return}const g=fromUTM(E,N,z.zone,z.south);lat=g.lat;lon=g.lon}
+  if(!(Math.abs(lat)<=90&&Math.abs(lon)<=180)){toast('Check the coordinates: they could not be read');return}
+  if(S.sample){S=blank();S.mode=$('#fMode').value;photos={};}
+  const rec={id:$('#fId').value.trim(),code:$('#fCode').value.trim().toUpperCase(),lat,lon,h:numOrNull($('#fH').value),acc:numOrNull($('#fAcc').value),fix:$('#fFix').value,note:$('#fNote').value.trim(),t:Date.now()};
+  let p;if(editing&&(p=S.points.find(x=>x.u===editing)))Object.assign(p,rec);else{p={u:uid(),...rec};S.points.push(p);fresh=p.u}
+  sel=p.u;const file=$('#fPh').files[0];if(file){try{savePhoto(p.u,await shrink(file));p.ph=true}catch(_){toast('That photo could not be read')}}
+  save();resetForm();renderPoints();toast(`Point ${rec.id} saved`)});
+$('#fCancel').onclick=()=>{resetForm();renderPoints()};
+$('#fMode').onchange=e=>setMode(e.target.value);
+$('#ptTable').addEventListener('click',e=>{const tr=e.target.closest('tr[data-u]');if(!tr)return;const u=tr.dataset.u,act=e.target.dataset.act;
+  if(act==='edit')return startEdit(u);
+  if(act==='del'){const i=S.points.findIndex(p=>p.u===u),p=S.points[i],ph=photos[u];S.points.splice(i,1);if(ph)dropPhoto(u);save();renderPoints();
+    undo=()=>{S.points.splice(i,0,p);if(ph)savePhoto(u,ph);save();renderPoints()};toast(`Deleted ${p.id}`,true);return}
+  sel=u;renderPoints()});
+$('#plot').addEventListener('click',e=>{const g=e.target.closest('g[data-u]');if(!g||!g.dataset.u)return;sel=g.dataset.u;renderPoints();
+  const tr=document.querySelector(`#ptTable tr[data-u="${sel}"]`);tr&&tr.scrollIntoView({behavior:'smooth',block:'center'})});
+$('#q').oninput=renderPoints;$('#onlyIss').onchange=renderPoints;
+$('#setBtn').onclick=()=>$('#setBox').classList.toggle('hide');$('#impBtn').onclick=()=>$('#impBox').classList.toggle('hide');
+for(const [id,k] of [['#sTol','tol'],['#sNear','near'],['#sCtl','minCtl'],['#sZone','zone']]){$(id).value=S[k];$(id).oninput=e=>{S[k]=k==='zone'?e.target.value.trim():(numOrNull(e.target.value)??S[k]);save();renderPoints()}}
+$('#projName').oninput=e=>{S.name=e.target.value;save()};
+$('#newJob').onclick=()=>{const old=JSON.stringify(S),ph={...photos};S=blank();photos={};sel=null;save();resetForm();syncSettings();renderPoints();renderDeed();
+  undo=()=>{S=JSON.parse(old);photos=ph;save();resetForm();syncSettings();renderPoints();renderDeed()};toast('Started a new job',true)};
+function syncSettings(){for(const [id,k] of [['#sTol','tol'],['#sNear','near'],['#sCtl','minCtl'],['#sZone','zone']])$(id).value=S[k]}
+/* CSV import */
+function parseCSV(txt){const lines=txt.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);if(!lines.length)return[];
+  const split=l=>l.split(/\s*[,;\t]\s*/);let rows=lines.map(split),hdr=null;
+  if(rows[0].some(c=>/[a-z]/i.test(c)&&!isFinite(+c)&&!/^\d/.test(c)))hdr=rows.shift().map(h=>h.toLowerCase());
+  const find=(...k)=>hdr?hdr.findIndex(h=>k.some(x=>h===x||h.startsWith(x))):-1;
+  let m;if(hdr)m={id:find('id','name','point','pt','p'),lat:find('lat'),lon:find('lon','lng','long'),E:find('easting','east','e','x'),N:find('northing','north','n','y'),h:find('h','elev','height','z','alt'),code:find('code','desc','d','feature'),acc:find('acc','hrms','hprec','sd')};
+  else{const c=rows[0].map(Number);m=Math.abs(c[1])<=90&&Math.abs(c[2])<=180?{id:0,lat:1,lon:2,h:3,code:4}:{id:0,N:1,E:2,h:3,code:4}}
+  const z=jobZone(),out=[];
+  for(const r of rows){let lat,lon;const g=i=>i!=null&&i>=0?r[i]:undefined;
+    if(m.lat>=0&&m.lat!=null&&g(m.lat)!==undefined){lat=parseAngle(g(m.lat));lon=parseAngle(g(m.lon))}
+    else{if(!z.zone)throw new Error('Set the UTM zone under Tolerances before importing grid coordinates');const ll=fromUTM(+g(m.E),+g(m.N),z.zone,z.south);lat=ll.lat;lon=ll.lon}
+    if(!(Math.abs(lat)<=90&&Math.abs(lon)<=180))continue;
+    out.push({u:uid(),id:String(g(m.id)??out.length+1),code:String(g(m.code)??'').toUpperCase(),lat,lon,h:numOrNull(g(m.h)??''),acc:numOrNull(g(m.acc)??''),fix:'RTK fixed',note:'Imported',t:Date.now()})}
+  return out}
+$('#impFile').onchange=async e=>{const f=e.target.files[0];if(f)$('#impTxt').value=await f.text()};
+$('#impGo').onclick=()=>{try{const pts=parseCSV($('#impTxt').value);if(!pts.length){toast('No points found in that text');return}
+  if(S.sample){S=blank();photos={}}S.points.push(...pts);save();resetForm();syncSettings();renderPoints();$('#impTxt').value='';$('#impBox').classList.add('hide');toast(`Imported ${pts.length} points. Solution set to RTK fixed — edit any that were not.`)}catch(err){toast(err.message)}};
+
+/* ---------- deed closure ---------- */
+$('#cUnit').innerHTML=Object.entries(UNITS).map(([k,v])=>`<option value="${k}">${v[0]}</option>`).join('');
+$('#d2').innerHTML=$('#cUnit').innerHTML;$('#d2').value='ch';
+function renderDeed(){$('#cUnit').value=S.deed.unit;$('#calls').innerHTML=S.deed.calls.map((c,i)=>`<div class="crow" data-i="${i}"><span>${i+1}</span><input aria-label="Bearing ${i+1}" data-k="b" value="${esc(c.b)}" placeholder="N 45°30'15&quot; E"><input aria-label="Distance ${i+1}" data-k="d" class="n" inputmode="decimal" value="${esc(c.d)}" placeholder="Distance"><button type="button" class="sm" data-del aria-label="Remove call ${i+1}">✕</button></div>`).join('');calcDeed()}
+function calcDeed(){const u=UNITS[S.deed.unit][1];let E=0,N=0,L=0;const V=[{E:0,N:0}],legs=[];
+  document.querySelectorAll('#calls .crow').forEach((r,i)=>{const c=S.deed.calls[i],az=parseBearing(c.b),d=numOrNull(c.d);
+    r.querySelector('[data-k=b]').classList.toggle('bad-in',!!c.b&&isNaN(az));r.querySelector('[data-k=d]').classList.toggle('bad-in',!!c.d&&d==null);
+    if(isNaN(az)||d==null)return;const dm=d*u;E+=dm*Math.sin(az*R);N+=dm*Math.cos(az*R);L+=dm;legs.push(dm);V.push({E,N})});
+  const mis=Math.hypot(E,N),n=V.length-1;
+  let area=0,adj=V.map(p=>({...p}));if(n>=3){let cum=0;for(let i=1;i<=n;i++){cum+=legs[i-1];adj[i].E-=E*cum/L;adj[i].N-=N*cum/L}
+    for(let i=0;i<n;i++)area+=adj[i].E*adj[i+1].N-adj[i+1].E*adj[i].N;area=Math.abs(area)/2}
+  const ratio=mis>1e-9?L/mis:Infinity,uu=S.deed.unit,ul=uu==='m'?'m':uu;
+  const verdict=n<3?'':ratio>=10000?'Excellent':ratio>=5000?'Good':ratio>=2500?'Fair':'Poor — check calls';
+  $('#cRes').innerHTML=`<div><span>Misclosure</span><b>${n?fmt(mis/u,3):'—'} ${ul}</b><small class="note">${n&&mis>1e-6?quad(Math.atan2(-E,-N)/R+0):''}</small></div><div><span>Precision</span><b>${n<3?'—':ratio===Infinity?'Closes':'1 : '+Math.round(ratio).toLocaleString('en')}</b><small class="note">${verdict}</small></div><div><span>Area (adjusted)</span><b>${n<3?'—':fmt(area/10000,4)+' ha'}</b><small class="note">${n<3?'':`${fmt(area/4046.8564224,3)} ac · ${fmt(area,1)} m² · ${Math.round(area/0.09290304).toLocaleString('en')} sq ft`}</small></div><div><span>Perimeter</span><b>${fmt(L/u,2)} ${ul}</b><small class="note">${n} calls</small></div>`;
+  const pts=V.map((p,i)=>({...p,id:i===0?'POB':String(i)}));
+  plot($('#cPlot'),pts,{empty:'Enter at least one call',extra:(X,Y)=>`<path d="M${V.map(p=>X(p.E)+' '+Y(p.N)).join('L')}" fill="var(--pinkbg)" fill-opacity=".6" stroke="var(--pink)" stroke-width="2.5"/>${n&&mis>1e-6?`<line x1="${X(E)}" y1="${Y(N)}" x2="${X(0)}" y2="${Y(0)}" stroke="var(--err)" stroke-width="2" stroke-dasharray="5 4"/>`:''}`})}
+$('#calls').addEventListener('input',e=>{const r=e.target.closest('.crow');if(!r)return;S.deed.calls[+r.dataset.i][e.target.dataset.k]=e.target.value;save();calcDeed()});
+$('#calls').addEventListener('click',e=>{if(!e.target.hasAttribute('data-del'))return;S.deed.calls.splice(+e.target.closest('.crow').dataset.i,1);if(!S.deed.calls.length)S.deed.calls.push({b:'',d:''});save();renderDeed()});
+$('#cAdd').onclick=()=>{S.deed.calls.push({b:'',d:''});save();renderDeed();const ins=document.querySelectorAll('#calls [data-k=b]');ins[ins.length-1].focus()};
+$('#cClear').onclick=()=>{const old=S.deed;S.deed={unit:old.unit,calls:[{b:'',d:''},{b:'',d:''},{b:'',d:''}]};save();renderDeed();undo=()=>{S.deed=old;save();renderDeed()};toast('Calls cleared',true)};
+$('#cUnit').onchange=e=>{S.deed.unit=e.target.value;save();calcDeed()};
+/* AI reading */
+let sample=null,ctl=null;
+const PROMPT=`You extract survey calls from a land boundary description (metes and bounds, deed, plan, field notes) which may come from any country and era. Reply with ONLY JSON in this shape:
+{"unit":"m","calls":[{"bearing":"N 45°30'15\\" E","distance":12.34}],"notes":"short caveats"}
+Rules: unit is one of m, ft, usft, ch, lk, rod, yd (use the unit the document uses; chains plus links become decimal chains, e.g. 3 chains 25 links = 3.25). Bearings as quadrant bearings N/S degrees minutes seconds E/W; convert azimuths or whole-circle bearings to quadrant form. Distances are plain numbers in that unit. List calls in order from the point of beginning. Leave out curve calls but mention them in notes, along with anything illegible or ambiguous. If there are no calls, return "calls":[].
+Document:
+`;
+async function aiRead(){const txt=$('#aiTxt').value.trim(),img=$('#aiImg').files[0];if(!txt&&!img){$('#aiMsg').textContent='Paste the description or choose a photo first.';return}
+  ctl=new AbortController();$('#aiGo').disabled=true;$('#aiStop').classList.remove('hide');$('#aiMsg').textContent='Reading the document…';
+  try{const r=await sample.json(PROMPT+(txt||'(see the attached image)'),{signal:ctl.signal,images:img?[img]:undefined});
+    const calls=(Array.isArray(r&&r.calls)?r.calls:[]).filter(c=>c&&c.bearing!=null).map(c=>({b:String(c.bearing),d:String(c.distance??'')}));
+    if(!calls.length){$('#aiMsg').textContent='No straight-line calls were found. '+(r&&r.notes?String(r.notes):'');return}
+    const old=S.deed;S.deed={unit:UNITS[r.unit]?r.unit:old.unit,calls};save();renderDeed();undo=()=>{S.deed=old;save();renderDeed()};
+    $('#aiMsg').textContent=`Read ${calls.length} calls. ${r.notes?String(r.notes)+' ':''}Check each against the source.`;toast('Calls filled in',true)}
+  catch(err){const m={cancelled:'Stopped.',not_granted:'Claude is not allowed for this page.',rate_limited:'Too many requests just now. Try again in a minute.',invalid_json:'The answer could not be read. Try again or paste less text.',image_rejected:'That image could not be used. Try a clearer or smaller photo.',refused:'Claude could not read that document.'};
+    $('#aiMsg').textContent=m[err&&err.code]||'Something went wrong. Try again.';if(err&&['not_granted','sampling_disabled','not_declared','capability_disabled','capability_removed'].includes(err.code))$('#aiBox').classList.add('hide')}
+  finally{$('#aiGo').disabled=false;$('#aiStop').classList.add('hide')}}
+$('#aiGo').onclick=aiRead;$('#aiStop').onclick=()=>ctl&&ctl.abort();
+
+/* ---------- converter ---------- */
+function conv(){const la=parseAngle($('#g1').value),lo=parseAngle($('#g2').value),go=$('#gOut');
+  if(Math.abs(la)<=84&&Math.abs(lo)<=180){const u=toUTM(la,lo);go.innerHTML=`<div><span>Zone</span><b>${u.zone}${u.south?'S':'N'}</b></div><div><span>Scale factor ≈</span><b>${u.k.toFixed(6)}</b></div><div><span>Easting</span><b>${fmt(u.E)}</b></div><div><span>Northing</span><b>${fmt(u.N)}</b></div><div style="grid-column:1/-1"><span>Decimal / convergence ≈</span><b style="font-size:18px">${la.toFixed(7)}, ${lo.toFixed(7)} · γ ${u.conv.toFixed(4)}°</b></div>`}
+  else go.innerHTML='<div style="grid-column:1/-1"><span>Check input</span><b style="font-size:18px">Latitude must be within ±84° for UTM</b></div>';
+  const z=parseZone($('#u0').value),E=numOrNull($('#u1').value),N=numOrNull($('#u2').value),uo=$('#uOut');
+  if(z&&E!=null&&N!=null){const g=fromUTM(E,N,z.zone,z.south);uo.innerHTML=`<div><span>Latitude</span><b style="font-size:20px">${dms(g.lat,'N','S')}</b></div><div><span>Longitude</span><b style="font-size:20px">${dms(g.lon,'E','W')}</b></div><div style="grid-column:1/-1"><span>Decimal degrees</span><b style="font-size:20px">${g.lat.toFixed(8)}, ${g.lon.toFixed(8)}</b></div>`}
+  else uo.innerHTML='<div style="grid-column:1/-1"><span>Check input</span><b style="font-size:18px">Zone like 21N or 33S, then easting and northing</b></div>';
+  const v=numOrNull($('#d1').value),fu=UNITS[$('#d2').value][1];
+  $('#dOut').innerHTML=v==null?'<tr><td class="note">Enter a value</td></tr>':Object.entries(UNITS).map(([k,x])=>`<tr><td>${x[0]}</td><td class="n">${(v*fu/x[1]).toLocaleString('en',{maximumFractionDigits:5})}</td></tr>`).join('')+`<tr><td class="note" colspan="2">1 chain = 100 links = 4 rods = 66 ft = 20.1168 m</td></tr>`}
+['#g1','#g2','#u0','#u1','#u2','#d1','#d2'].forEach(id=>$(id).addEventListener('input',conv));
+
+/* ---------- export ---------- */
+function crc32(u8){const t=crc32.t||(crc32.t=Array.from({length:256},(_,k)=>{let c=k;for(let j=0;j<8;j++)c=c&1?0xEDB88320^(c>>>1):c>>>1;return c>>>0}));let r=-1;for(const b of u8)r=t[(r^b)&255]^(r>>>8);return(r^-1)>>>0}
+function zip(files){const enc=new TextEncoder(),parts=[],cen=[];let off=0;
+  for(const fl of files){const nm=enc.encode(fl.name),d=enc.encode(fl.text),crc=crc32(d),h=new DataView(new ArrayBuffer(30)),c=new DataView(new ArrayBuffer(46));
+    [[0,0x04034b50,4],[4,20,2],[6,0x800,2],[12,0x21,2],[14,crc,4],[18,d.length,4],[22,d.length,4],[26,nm.length,2]].forEach(([o,v,s])=>s===4?h.setUint32(o,v,true):h.setUint16(o,v,true));
+    [[0,0x02014b50,4],[4,20,2],[6,20,2],[8,0x800,2],[14,0x21,2],[16,crc,4],[20,d.length,4],[24,d.length,4],[28,nm.length,2],[42,off,4]].forEach(([o,v,s])=>s===4?c.setUint32(o,v,true):c.setUint16(o,v,true));
+    parts.push(new Uint8Array(h.buffer),nm,d);cen.push(new Uint8Array(c.buffer),nm);off+=30+nm.length+d.length}
+  const cs=cen.reduce((s,x)=>s+x.length,0),q=new DataView(new ArrayBuffer(22));q.setUint32(0,0x06054b50,true);q.setUint16(8,files.length,true);q.setUint16(10,files.length,true);q.setUint32(12,cs,true);q.setUint32(16,off,true);
+  return new Blob([...parts,...cen,new Uint8Array(q.buffer)])}
+const slug=()=>(S.name||'plumb-job').replace(/[^\w-]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||'plumb-job';
+const F={
+ csv:{t:'CSV (PNEZD)',d:'Point, northing, easting, elevation, description. Opens in Civil 3D, Carlson, TBC, QGIS and spreadsheets.',ext:'csv',make:C=>C.pts.map(p=>[p.id,p.N.toFixed(4),p.E.toFixed(4),p.h==null?'':p.h.toFixed(4),`"${(p.code+(p.note?' '+p.note:'')).replace(/"/g,"'")}"`].join(',')).join('\r\n')},
+ geo:{t:'GeoJSON',d:'WGS84 points with all attributes and QA flags, for GIS and web maps.',ext:'json',make:C=>JSON.stringify({type:'FeatureCollection',name:S.name,features:C.pts.map(p=>({type:'Feature',geometry:{type:'Point',coordinates:p.h==null?[+p.lon.toFixed(9),+p.lat.toFixed(9)]:[+p.lon.toFixed(9),+p.lat.toFixed(9),p.h]},properties:{id:p.id,code:p.code,note:p.note,solution:p.fix,h_accuracy_m:p.acc,easting:+p.E.toFixed(4),northing:+p.N.toFixed(4),utm_zone:C.Z.zone+(C.Z.south?'S':'N'),qa:p.flags.map(f=>f[1])}}))},null,1)},
+ dxf:{t:'DXF',d:'Points and labels on a layer per code, in UTM metres. Inside the CAD pack.',ext:'dxf',make:C=>['0','SECTION','2','ENTITIES',...C.pts.flatMap(p=>{const L=(p.code||'PTS').replace(/[^\w-]/g,'_'),x=p.E.toFixed(4),y=p.N.toFixed(4),z=(p.h??0).toFixed(4);return['0','POINT','8',L,'10',x,'20',y,'30',z,'0','TEXT','8',L+'_TXT','10',(p.E+0.3).toFixed(4),'20',(p.N+0.3).toFixed(4),'30',z,'40','0.5','1',p.id]}),'0','ENDSEC','0','EOF'].join('\r\n')},
+ xml:{t:'LandXML 1.2',d:'Coordinate geometry points for Civil 3D, 12d, TBC and machine control. Inside the CAD pack.',ext:'xml',make:C=>{const d=new Date().toISOString();return `<?xml version="1.0" encoding="UTF-8"?>\n<LandXML xmlns="http://www.landxml.org/schema/LandXML-1.2" version="1.2" date="${d.slice(0,10)}" time="${d.slice(11,19)}">\n <Units><Metric linearUnit="meter" areaUnit="squareMeter" volumeUnit="cubicMeter" angularUnit="decimal degrees" directionUnit="decimal degrees"/></Units>\n <Project name="${esc(S.name||'Plumb job')}" desc="UTM zone ${C.Z.zone}${C.Z.south?'S':'N'} WGS84"/>\n <CgPoints>\n${C.pts.map(p=>`  <CgPoint name="${esc(p.id)}" code="${esc(p.code)}" desc="${esc(p.note)}">${p.N.toFixed(4)} ${p.E.toFixed(4)}${p.h==null?'':' '+p.h.toFixed(4)}</CgPoint>`).join('\n')}\n </CgPoints>\n</LandXML>`}},
+ rep:{t:'Field QA report',d:'A plain-text summary of checks to file with the job or send to the office.',ext:'txt',make:C=>{const bad=C.pts.filter(p=>p.flags.length);return [`PLUMB FIELD QA — ${S.name||'Untitled job'}`,`Date: ${new Date().toISOString().slice(0,16).replace('T',' ')} UTC`,`Points: ${C.pts.length}   UTM zone ${C.Z.zone}${C.Z.south?'S':'N'} (WGS84)`,`Tolerances: H. accuracy ${S.tol} m, double shot ${S.near} m, min. control ${S.minCtl}`,'',...(C.job.length?['JOB',...C.job.map(j=>'  - '+j),'']:[]),bad.length?'POINT CHECKS':'All points clear.',...bad.map(p=>`  ${p.id.padEnd(8)} ${p.flags.map(f=>f[1]).join('; ')}`)].join('\n')}}};
+let downloads=null;
+function renderExport(){const C=lastC||compute();$('#expLede').textContent=C.pts.length?`${C.pts.length} points in UTM zone ${C.Z.zone}${C.Z.south?'S':'N'}, WGS84. Grid coordinates are in metres; heights are as recorded.`:'Add some points first.';
+  $('#expGrid').innerHTML=`<div class="card"><h3>CAD pack (.zip)</h3><p>DXF, LandXML, PNEZD CSV, GeoJSON and the QA report together, in one file.</p><div class="btns">${downloads?'<button class="pri" data-zip>Download pack</button>':'<span class="note">Downloads are not available here. Use Copy on each format.</span>'}</div></div>`+
+  Object.entries(F).map(([k,x])=>`<div class="card"><h3>${x.t}</h3><p>${x.d}</p><div class="btns"><button data-copy="${k}">Copy</button><button data-pv="${k}">Preview</button>${downloads&&!['dxf','xml'].includes(k)?`<button data-dl="${k}">Download</button>`:''}</div></div>`).join('')}
+async function dl(name,data){try{await downloads.save({filename:name,data});toast('Saved '+name)}catch(e){if(e&&e.code!=='declined')toast('Could not save the file')}}
+/* standalone builds (Windows / Android / browser): native saving and device GPS */
+const NATIVE=!window.claude, CAP=window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform();
+if(NATIVE){downloads={save:async({filename,data})=>{const blob=data instanceof Blob?data:new Blob([data]);
+  if(CAP){const P=window.Capacitor.Plugins,b64=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(String(fr.result).split(',')[1]);fr.readAsDataURL(blob)});
+    const w=await P.Filesystem.writeFile({path:filename,data:b64,directory:'CACHE'});await P.Share.share({title:filename,files:[w.uri]});return{status:'saved'}}
+  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000);return{status:'saved'}}}}
+if(NATIVE&&navigator.geolocation){const gb=$('#gpsBtn'),gm=$('#gpsMsg');gb.classList.remove('hide');let watch=null;
+  gb.onclick=()=>{if(watch!=null){navigator.geolocation.clearWatch(watch);watch=null;gb.textContent='Use device GPS';return}
+    const fixes=[];gb.textContent='Stop';gm.classList.remove('hide');gm.textContent='Waiting for satellites…';
+    const done=()=>{navigator.geolocation.clearWatch(watch);watch=null;gb.textContent='Use device GPS';if(!fixes.length)return;
+      const best=fixes.filter(x=>x.accuracy<=Math.min(...fixes.map(y=>y.accuracy))*1.5),m=k=>best.reduce((s,x)=>s+x[k],0)/best.length,alts=best.filter(x=>x.altitude!=null);
+      setMode('geo');$('#fA').value=m('latitude').toFixed(9);$('#fB').value=m('longitude').toFixed(9);$('#fAcc').value=(Math.min(...best.map(x=>x.accuracy))).toFixed(2);
+      $('#fH').value=alts.length?(alts.reduce((s,x)=>s+x.altitude,0)/alts.length).toFixed(2):'';$('#fFix').value='Autonomous';
+      gm.textContent=`Averaged ${best.length} of ${fixes.length} fixes. Phone GPS is metre-level and heights are ellipsoidal: fine for locating, not for boundaries.`};
+    watch=navigator.geolocation.watchPosition(p=>{fixes.push(p.coords);gm.textContent=`${fixes.length} fixes · best ±${Math.min(...fixes.map(x=>x.accuracy)).toFixed(1)} m · averaging for 15 s`;if(fixes.length===1)setTimeout(()=>watch!=null&&done(),15000)},
+      err=>{gm.textContent='Location unavailable: '+err.message;navigator.geolocation.clearWatch(watch);watch=null;gb.textContent='Use device GPS'},{enableHighAccuracy:true,maximumAge:0,timeout:30000})}}
+if(NATIVE){$('#aiBox').classList.add('hide');setSync('Saved on this device')}
+$('#expGrid').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;const C=compute();
+  if(!C.pts.length){toast('No points to export yet');return}
+  if(b.dataset.pv){$('#expPre').textContent=F[b.dataset.pv].make(C).slice(0,6000)}
+  if(b.dataset.copy){const t=F[b.dataset.copy].make(C);$('#expPre').textContent=t.slice(0,6000);try{await navigator.clipboard.writeText(t);toast(F[b.dataset.copy].t+' copied')}catch(_){toast('Copy blocked here; select the preview text instead')}}
+  if(b.dataset.dl){const x=F[b.dataset.dl];dl(`${slug()}.${x.ext}`,x.make(C))}
+  if(b.hasAttribute('data-zip')){const s=slug();dl(`${s}.zip`,zip([{name:`${s}.dxf`,text:F.dxf.make(C)},{name:`${s}.xml`,text:F.xml.make(C)},{name:`${s}.csv`,text:F.csv.make(C)},{name:`${s}.geojson`,text:F.geo.make(C)},{name:`${s}-QA.txt`,text:F.rep.make(C)}]))}});
+
+/* ---------- shell ---------- */
+let tt;function toast(m,withUndo){$('#toastMsg').textContent=m;$('#toastBtn').classList.toggle('hide',!withUndo);$('#toast').style.display='flex';clearTimeout(tt);tt=setTimeout(()=>{$('#toast').style.display='none';undo=null},withUndo?7000:3500)}
+$('#toastBtn').onclick=()=>{if(undo){undo();undo=null}$('#toast').style.display='none'};
+const VIEWS=['points','closure','convert','export'];
+function route(){const v=VIEWS.includes(location.hash.slice(1))?location.hash.slice(1):'points';
+  VIEWS.forEach(x=>$('#v-'+x).classList.toggle('on',x===v));document.querySelectorAll('nav.tabs a').forEach(a=>a.classList.toggle('on',a.getAttribute('href')==='#'+v));
+  if(v==='points')renderPoints();if(v==='closure')calcDeed();if(v==='export')renderExport()}
+addEventListener('hashchange',route);
+$('#codes').innerHTML=CODES.map(c=>`<option value="${c}">`).join('');
+const ro=new ResizeObserver(()=>{if($('#v-points').classList.contains('on'))plot($('#plot'),(lastC||compute()).pts,{sev});if($('#v-closure').classList.contains('on'))calcDeed()});
+ro.observe($('#plotWrap'));ro.observe($('#cPlot').parentNode);
+resetForm();renderDeed();conv();route();
+
+/* ---------- platform capabilities ---------- */
+(async()=>{if(!window.claude||!claude.use)return;
+  claude.use('downloads').then(d=>{downloads=d;renderExport()}).catch(()=>{});
+  claude.use('sample').then(async s=>{sample=s;if(!s){$('#aiBox').classList.add('hide');return}
+    try{const l=await s.limits();if(l&&l.images){$('#aiImgRow').classList.remove('hide');$('#aiImg').accept=l.images.mediaTypes.join(',')}}catch(_){}}).catch(()=>$('#aiBox').classList.add('hide'));
+  try{const [u,d]=await Promise.all([claude.use('user'),claude.use('db')]);if(!u||!d)return;const id=await u.id();if(!id)return;
+    setSync('Connecting…');const timer=setTimeout(()=>setSync('Saved on this device'),10000);
+    const snap=await d.doc(`data/users/${id}/project`).get();clearTimeout(timer);db=d;myId=id;
+    const remote=snap.exists?snap.data():null;
+    if(remote&&remote.updated>(S.updated||0)){S=Object.assign(blank(),JSON.parse(remote.json));try{localStorage.setItem('plumb.v1',remote.json)}catch(_){}
+      for(const p of S.points)if(p.ph&&!photos[p.u]){d.doc(`data/users/${id}/ph-${p.u}`).get().then(s=>{if(s.exists){photos[p.u]=s.data().d;renderPoints()}}).catch(()=>{})}
+      syncSettings();resetForm();renderDeed();route();setSync('Synced with your account')}
+    else if(S.updated){pushRemote();for(const p of S.points)if(photos[p.u])d.doc(`data/users/${id}/ph-${p.u}`).set({d:photos[p.u]}).catch(()=>{})}
+    else setSync('Synced with your account')}
+  catch(_){setSync('Saved on this device')}})();
+}
+</script>
+</body>
+</html>
